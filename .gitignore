@@ -1,3 +1,7 @@
+# Exclude PyCharm or other JetBrains IDE settings:
+.idea
+.idea/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
