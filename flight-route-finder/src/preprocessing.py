@@ -4,7 +4,7 @@ Data preprocessing module for flight route finder.
 This module handles the preprocessing of flight data tables including:
 - Extracting city names from arrival and departure cities
 - Extracts longitude and latitude from coordinate columns
-- Converting times to a standardized format
+- Converting times to datetime format
 - Calculate flight duration based on departure and arrival times
 - Handling missing values, especially for prices
 - Creating airport-city mappings
@@ -126,10 +126,6 @@ def process_time_columns(df):
     """
     Converts time-related string columns to datetime format and computes flight duration in hours.
 
-    This function converts 'scheduled_departure' and 'scheduled_arrival' columns
-    from string to timezone-aware datetime objects. It also adds a new column:
-    - 'flight_duration_hours': numeric value in hours (float)
-
     :param df: DataFrame with 'scheduled_departure' and 'scheduled_arrival' columns
     :return df: Updated DataFrame with:
                 - datetime-converted departure and arrival columns
@@ -154,5 +150,67 @@ def process_time_columns(df):
     result_df['flight_duration_hours'] = (
         (result_df['scheduled_arrival'] - result_df['scheduled_departure']).dt.total_seconds() / 3600
     )
+
+    return result_df
+
+
+def fill_missing_amount_by_route_type(df):
+    """
+    Fills missing 'amount' values based on route type (core vs. niche):
+    - For core routes (those with flight_id count >= average), missing values are filled using the route's mean amount.
+    - For niche routes (those with flight_id count < average), rows with missing amount are dropped.
+
+    A route is defined by the combination of 'departure_airport' and 'arrival_airport'.
+    Core routes are considered frequent routes, while niche routes are considered infrequent based on the number of unique flight IDs.
+
+    :param df: DataFrame containing at least the following columns:
+               - 'departure_airport'
+               - 'arrival_airport'
+               - 'flight_id'
+               - 'amount'
+    :return df: A cleaned DataFrame with all missing 'amount' values handled.
+
+    >>> import numpy as np
+    >>> df_test = pd.DataFrame({
+    ...     'departure_airport': ['A', 'A', 'A', 'B', 'B', 'C'],
+    ...     'arrival_airport':   ['X', 'X', 'X', 'Y', 'Y', 'Z'],
+    ...     'flight_id':         [1, 2, 3, 4, 5, 6],
+    ...     'amount':            [100, 200, np.nan, 300, 400, np.nan]
+    ... })
+    >>> cleaned = fill_missing_amount_by_route_type(df_test.copy())
+    >>> cleaned = cleaned.sort_values(by='flight_id').reset_index(drop=True)
+    >>> cleaned = cleaned.sort_index()
+    >>> cleaned['amount'].tolist()
+    [100.0, 200.0, 150.0, 300.0, 400.0]
+    """
+
+    result_df = df.copy()
+
+    # Define route as the combination of departure and arrival airports
+    result_df['route'] = result_df['departure_airport'] + ' → ' + result_df['arrival_airport']
+
+    # Count unique flight IDs per route
+    route_flight_counts = result_df.groupby('route')['flight_id'].nunique()
+
+    # Use average flight count per route as the threshold to classify routes
+    avg_flight_count = route_flight_counts.mean()
+
+    # Classify routes as 'core' or 'niche'
+    route_type_map = route_flight_counts.apply(lambda x: 'core' if x >= avg_flight_count else 'niche')
+    result_df['route_type'] = result_df['route'].map(route_type_map)
+
+    # Fill missing amounts in core routes with route mean
+    route_mean_amount = result_df.groupby('route')['amount'].transform(
+        lambda x: pd.to_numeric(x, errors='coerce').mean()
+    )
+    result_df['amount'] = result_df.apply(
+        lambda row: route_mean_amount[row.name]
+        if pd.isna(row['amount']) and row['route_type'] == 'core'
+        else row['amount'],
+        axis=1
+    )
+
+    # Drop rows from niche routes where amount is still missing
+    result_df = result_df[~((result_df['route_type'] == 'niche') & (result_df['amount'].isna()))]
 
     return result_df
