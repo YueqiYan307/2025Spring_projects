@@ -173,3 +173,5 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+flight-route-finder/data/travel.sqlite
