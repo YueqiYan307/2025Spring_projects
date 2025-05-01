@@ -120,3 +120,39 @@ def extract_coordinates(df):
             result_df[lat_col] = np.nan
 
     return result_df
+
+
+def process_time_columns(df):
+    """
+    Converts time-related string columns to datetime format and computes flight duration in hours.
+
+    This function converts 'scheduled_departure' and 'scheduled_arrival' columns
+    from string to timezone-aware datetime objects. It also adds a new column:
+    - 'flight_duration_hours': numeric value in hours (float)
+
+    :param df: DataFrame with 'scheduled_departure' and 'scheduled_arrival' columns
+    :return df: Updated DataFrame with:
+                - datetime-converted departure and arrival columns
+                - flight_duration_hours (as float)
+
+    >>> df_test = pd.DataFrame({
+    ...     'scheduled_departure': ['2017-09-02 08:55:00+03', '2017-09-02 12:00:00+03'],
+    ...     'scheduled_arrival': ['2017-09-02 10:55:00+03', '2017-09-02 14:15:00+03']
+    ... })
+    >>> result = process_time_columns(df_test.copy())
+    >>> result['flight_duration_hours'].round(2).tolist()
+    [2.0, 2.25]
+    """
+
+    result_df = df.copy()
+
+    # 转换时间为 datetime 类型
+    result_df['scheduled_departure'] = pd.to_datetime(result_df['scheduled_departure'], errors='coerce')
+    result_df['scheduled_arrival'] = pd.to_datetime(result_df['scheduled_arrival'], errors='coerce')
+
+    # 计算飞行时长（单位：小时）
+    result_df['flight_duration_hours'] = (
+        (result_df['scheduled_arrival'] - result_df['scheduled_departure']).dt.total_seconds() / 3600
+    )
+
+    return result_df
