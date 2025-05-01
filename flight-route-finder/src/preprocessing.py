@@ -214,3 +214,31 @@ def fill_missing_amount_by_route_type(df):
     result_df = result_df[~((result_df['route_type'] == 'niche') & (result_df['amount'].isna()))]
 
     return result_df
+
+
+def city_to_airports_map(df):
+    """
+    Builds a dictionary mapping each English city name to a list of its associated departure airport codes.
+
+    :param df: DataFrame that contains 'departure_city_name' and 'departure_airport'
+    :return: Dictionary {city_name: [airport_code1, airport_code2, ...]}
+
+    >>> df_test = pd.DataFrame({
+    ...     'departure_city_name': ['Moscow', 'Moscow', 'Sochi'],
+    ...     'departure_airport': ['SVO', 'DME', 'AER']
+    ... })
+    >>> city_airport_map = city_to_airports_map(df_test.copy())
+    >>> sorted(city_airport_map['Moscow'])
+    ['DME', 'SVO']
+    >>> city_airport_map['Sochi']
+    ['AER']
+    """
+    result_df = df.copy()
+    mapping = (
+        result_df.groupby('departure_city_name')['departure_airport']
+        .unique()
+        .dropna()
+        .apply(list)
+        .to_dict()
+    )
+    return mapping
