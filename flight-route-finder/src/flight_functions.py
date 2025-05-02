@@ -185,3 +185,148 @@ def _find_time_aware_paths(G, origin_airport, dest_airport, max_segments):
                         queue.append((neighbor, new_path, flight_data['arrival_time']))
 
     return valid_paths
+
+
+from datetime import timedelta
+import networkx as nx
+
+def get_path_details(G, path, min_layover=timedelta(hours=1)):
+    """
+    Compute detailed info for a given airport‐code path, including each segment’s
+    departure/arrival times & price, plus the journey’s total price, total duration,
+    and number of transfers.
+
+    :param G: networkx.DiGraph or MultiDiGraph
+              Each edge must carry at least:
+                - 'departure_time': pandas.Timestamp
+                - 'arrival_time'  : pandas.Timestamp
+                - 'price'         : numeric
+    :param path: list of airport codes, e.g. ['A','B','C']
+    :param min_layover: timedelta, minimum required time between arrival and next departure
+
+    :return: dict with:
+             - 'path'           : list of segment‐dicts
+             - 'total_price'    : sum of all segment prices
+             - 'total_duration' : sum of all segment durations
+             - 'transfers'      : number of connections (len(path)-2)
+             or None if any segment fails the time‐connection rule.
+
+    >>> import pandas as pd
+    >>> G = nx.DiGraph()
+    >>> G.add_edge('A','B',
+    ...            departure_time=pd.Timestamp('2020-01-01T10:00:00'),
+    ...            arrival_time  =pd.Timestamp('2020-01-01T12:00:00'),
+    ...            price=100)
+    >>> G.add_edge('B','C',
+    ...            departure_time=pd.Timestamp('2020-01-01T13:30:00'),
+    ...            arrival_time  =pd.Timestamp('2020-01-01T15:00:00'),
+    ...            price=150)
+    >>> details = get_path_details(G, ['A','B','C'])
+    >>> details['total_price']
+    250
+    >>> details['transfers']
+    1
+    >>> # invalid layover (<1h) returns None
+    >>> G.add_edge('B','D',
+    ...            departure_time=pd.Timestamp('2020-01-01T12:30:00'),
+    ...            arrival_time  =pd.Timestamp('2020-01-01T13:30:00'),
+    ...            price=200)
+    >>> get_path_details(G, ['A','B','D']) is None
+    True
+    """
+    path_segments = []
+    total_price    = 0
+    total_duration = timedelta(0)
+    last_arrival   = None
+
+    # walk through each hop in the given airport list
+    for origin, dest in zip(path, path[1:]):
+        data = G.get_edge_data(origin, dest)
+        if data is None:
+            # no flights on this leg
+            return None
+
+        # unpack candidates (MultiDiGraph vs DiGraph)
+        if isinstance(G, nx.MultiDiGraph):
+            candidates = [edge for _, edge in data.items()]
+        else:
+            candidates = [data]
+
+        # pick first flight satisfying layover
+        chosen = None
+        for flight in candidates:
+            dep = flight.get('departure_time')
+            # first leg has no layover constraint
+            if last_arrival is None or dep >= last_arrival + min_layover:
+                chosen = flight
+                break
+
+        if chosen is None:
+            # no valid connecting flight
+            return None
+
+        # record this segment
+        arr = chosen.get('arrival_time')
+        dur = arr - dep
+        path_segments.append({
+            'from':      origin,
+            'to':        dest,
+            'departure': dep,
+            'arrival':   arr,
+            'price':     chosen['price']
+        })
+        total_price    += chosen['price']
+        total_duration += dur
+        last_arrival    = arr
+
+    return {
+        'path':           path_segments,
+        'total_price':    total_price,
+        'total_duration': total_duration,
+        'transfers':      len(path) - 2
+    }
+
+
+from datetime import timedelta
+
+def select_best_routes(all_path_details):
+    """
+    Select three optimal routes from a list of path detail dicts:
+      - 'cheapest': the route with minimal total_price
+      - 'fastest': the route with minimal total_duration
+      - 'least_transfers': the route with minimal transfers
+
+    :param all_path_details: list of dicts, each dict must contain keys:
+                             'path', 'total_price', 'total_duration', 'transfers'
+    :return: dict with keys 'cheapest', 'fastest', 'least_transfers',
+             each mapping to one of the input dicts. Returns None if input is empty.
+
+    >>> from datetime import timedelta
+    >>> paths = [
+    ...     {'path': [], 'total_price': 100, 'total_duration': timedelta(hours=2),    'transfers': 1},
+    ...     {'path': [], 'total_price': 150, 'total_duration': timedelta(hours=1, minutes=30), 'transfers': 0},
+    ...     {'path': [], 'total_price':  80, 'total_duration': timedelta(hours=3),    'transfers': 2}
+    ... ]
+    >>> best = select_best_routes(paths)
+    >>> best['cheapest']['total_price']
+    80
+    >>> best['fastest']['total_duration']
+    datetime.timedelta(seconds=5400)
+    >>> best['least_transfers']['transfers']
+    0
+    """
+    if not all_path_details:
+        return None
+
+    # cheapest by price
+    cheapest = min(all_path_details, key=lambda x: x['total_price'])
+    # fastest by duration
+    fastest = min(all_path_details, key=lambda x: x['total_duration'])
+    # fewest transfers
+    least_transfers = min(all_path_details, key=lambda x: x['transfers'])
+
+    return {
+        'cheapest': cheapest,
+        'fastest': fastest,
+        'least_transfers': least_transfers
+    }
