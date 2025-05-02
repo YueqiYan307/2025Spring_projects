@@ -3,9 +3,6 @@ Flight Route Finder
 
 A command-line application to find flight routes between cities using preprocessed flight data.
 This module serves as the entry point for the flight route finder application.
-
-Usage:
-    python main.py [--data PATH_TO_DATA]
 """
 
 import sys
