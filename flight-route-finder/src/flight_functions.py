@@ -11,29 +11,27 @@ import pandas as pd
 import pytz
 
 
-def build_flight_graph(flights_df, departure_time, city_to_airports=None):
+def build_flight_graph(flights_df, departure_time):
     """
     Build a directed graph of flights that occur after the specified departure time.
 
     :param flights_df: DataFrame, preprocessed flight data
            departure_time : datetime, the earliest time a passenger can depart
-           city_to_airports : dict, mapping of cities to their airport codes
-
-    :return tuple: (networkx.DiGraph, set of airport nodes, city_to_airports mapping)
+    :return tuple: (networkx.DiGraph, set of airport nodes)
 
     >>> data = {
     ...     'flight_id': ['11', '12'],
     ...     'flight_no': ['PG1234', 'PG5678'],
     ...     'departure_airport': ['SVO', 'LED'],
     ...     'arrival_airport': ['LED', 'SVO'],
-    ...     'scheduled_departure': [datetime(2023, 1, 1, 10, tzinfo=pytz.UTC), datetime(2023, 1, 1, 14, tzinfo=pytz.UTC)],
-    ...     'scheduled_arrival': [datetime(2023, 1, 1, 12, tzinfo=pytz.UTC), datetime(2023, 1, 1, 16, tzinfo=pytz.UTC)],
+    ...     'scheduled_departure': [pd.Timestamp('2023-01-01 10:00:00'), pd.Timestamp('2023-01-01 14:00:00')],
+    ...     'scheduled_arrival':   [pd.Timestamp('2023-01-01 12:00:00'), pd.Timestamp('2023-01-01 16:00:00')],
     ...     'flight_duration_hours': [2.0, 2.25],
     ...     'amount': [100, 120]
     ... }
     >>> df = pd.DataFrame(data)
-    >>> departure_time = datetime(2023, 1, 1, 8, tzinfo=pytz.UTC)
-    >>> G, airport_nodes, _ = build_flight_graph(df, departure_time)
+    >>> departure_time = pd.Timestamp('2023-01-01 08:00:00')
+    >>> G, airport_nodes = build_flight_graph(df, departure_time)
     >>> len(G.edges())
     2
     >>> 'SVO' in airport_nodes
@@ -76,37 +74,39 @@ def build_flight_graph(flights_df, departure_time, city_to_airports=None):
         # Add edge with flight attributes
         G.add_edge(departure_airport, arrival_airport, **edge_attrs)
 
-    return G, airport_nodes, city_to_airports
+    return G, airport_nodes
 
 
-def find_all_paths(G, city_to_airports, departure, arrival, max_segments=3):
+def find_all_paths(G, city_to_airports_map, departure, arrival, max_segments=3):
     """
     Find all possible paths from origin city to destination city.
 
     :param G: networkx.DiGraph, Flight graph
-           city_to_airports : dict, Mapping of cities to their airport codes
-           departure : str, origin city
-           arrival : str, destination city
-           max_segments : int, default=3, Maximum number of flight segments to consider
+           city_to_airports_map: dict, Mapping of cities to their airport codes
+           departure: str, origin city
+           arrival: str, destination city
+           max_segments: int, default=3, Maximum number of flight segments to consider
 
     :return: List of valid paths, where each path is a list of flight edges
 
     >>> G = nx.DiGraph()
+    >>> city_to_airports_map = {'Moscow': ['SVO', 'VKO'], 'St Petersburg': ['LED'], 'Kazan': ['KZN']}
     >>> G.add_edge('SVO', 'LED', departure=pd.Timestamp('2020-01-01 10:00'), arrival=pd.Timestamp('2020-01-01 11:00'), price=100)
-    >>> G.add_edge('LED', 'VKO', departure=pd.Timestamp('2020-01-01 12:00'), arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
-    >>> paths = find_all_paths(G, 'SVO', 'VKO', 2)
+    >>> G.add_edge('VKO', 'KZN', departure=pd.Timestamp('2020-01-01 11:30'), arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
+    >>> G.add_edge('LED', 'KZN', departure=pd.Timestamp('2020-01-01 12:00'), arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
+    >>> paths = find_all_paths(G, city_to_airports_map, 'Moscow', 'Kazan')
     >>> [p for p in paths]
-    [['SVO', 'LED', 'VKO']]
+    [['VKO', 'KZN'], ['SVO', 'LED', 'KZN']]
     """
     if G is None:
         raise ValueError("Flight graph not built")
 
-    if city_to_airports is None:
+    if city_to_airports_map is None:
         raise ValueError("City to airports mapping not provided")
 
     # Get all airports for origin and destination cities
-    origin_airports = city_to_airports.get(departure, [])
-    dest_airports = city_to_airports.get(arrival, [])
+    origin_airports = city_to_airports_map.get(departure, [])
+    dest_airports = city_to_airports_map.get(arrival, [])
 
     if not origin_airports:
         raise ValueError(f"No airports found for origin city: {departure}")
