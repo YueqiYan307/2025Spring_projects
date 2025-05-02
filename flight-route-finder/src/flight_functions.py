@@ -242,7 +242,7 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
         # pick first flight satisfying layover
         chosen = None
         for flight in candidates:
-            dep = flight.get('departure_time')
+            dep = flight.get('scheduled_departure')
             # first leg has no layover constraint
             if last_arrival is None or dep >= last_arrival + min_layover:
                 chosen = flight
@@ -253,7 +253,7 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
             return None
 
         # record this segment
-        arr = chosen.get('arrival_time')
+        arr = chosen.get('scheduled_arrival')
         dur = arr - dep
         path_segments.append({
             'from':      origin,
