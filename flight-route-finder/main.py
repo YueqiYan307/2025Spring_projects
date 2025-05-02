@@ -3,13 +3,17 @@ Flight Route Finder
 
 A command-line application to find flight routes between cities using preprocessed flight data.
 This module serves as the entry point for the flight route finder application.
+
+Usage:
+    python main.py [--data PATH_TO_DATA]
 """
 
+import os
 import sys
 import argparse
 import pandas as pd
-from datetime import datetime
-
+from datetime import datetime, timedelta
+import pytz
 from src.preprocessing import (
     extract_city_names,
     extract_coordinates,
@@ -34,7 +38,15 @@ def parse_arguments():
 
 
 def load_and_preprocess_data(file_path):
-    """Load flight data from CSV and preprocess it."""
+    """
+    Load flight data from CSV and preprocess it.
+
+    Args:
+        file_path: Path to the flight data CSV file
+
+    Returns:
+        Preprocessed DataFrame and city-to-airports mapping
+    """
     try:
         print(f"Loading flight data from {file_path}...")
         df = pd.read_csv(file_path)
@@ -54,7 +66,6 @@ def load_and_preprocess_data(file_path):
     city_airports = city_to_airports_map(df)
 
     print(f"Data preprocessing complete. {len(df)} flights available.")
-    print (df.head)
     return df, city_airports
 
 
@@ -64,7 +75,15 @@ def get_cities_list(city_airports):
 
 
 def get_user_input(cities):
-    """Get user input for departure and arrival cities and departure date/time."""
+    """
+    Get user input for departure and arrival cities and departure date/time.
+
+    Args:
+        cities: List of available cities
+
+    Returns:
+        Tuple with (departure_city, arrival_city, departure_time)
+    """
     while True:
         try:
             # Get departure city
@@ -163,7 +182,7 @@ def main():
 
         # Find all possible paths
         try:
-            paths = find_all_paths(flight_graph, city_to_airports_map, departure_city, arrival_city)
+            paths = find_all_paths(flight_graph, city_airports, departure_city, arrival_city)
 
             # Get detailed information for each path
             path_details = []
