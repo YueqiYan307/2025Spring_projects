@@ -1,0 +1,5 @@
+pandas~=2.2.3
+numpy~=2.2.5
+networkx~=3.4.2
+pytz~=2025.2
+python-dateutil~=2.9.0.post0

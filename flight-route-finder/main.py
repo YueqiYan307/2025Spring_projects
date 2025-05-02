@@ -114,7 +114,7 @@ def get_user_input(cities):
 def display_route(route_type, route_details):
     """Display a single route with all details."""
     print(f"\n{route_type.upper()} ROUTE:")
-    print(f"  Total price: ${route_details['total_price']:.2f}")
+    print(f"  Total price: {route_details['total_price']:.2f}")
     print(f"  Total duration: {route_details['total_duration']}")
     print(f"  Transfers: {route_details['transfers']}")
 
@@ -123,7 +123,7 @@ def display_route(route_type, route_details):
         print(f"  {i}. {segment['from']} → {segment['to']}")
         print(f"     Departure: {segment['departure']}")
         print(f"     Arrival: {segment['arrival']}")
-        print(f"     Price: ${segment['price']:.2f}")
+        print(f"     Price: {segment['price']:.2f}")
 
 
 def display_results(best_routes):
