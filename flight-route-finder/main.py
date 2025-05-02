@@ -163,7 +163,7 @@ def main():
 
         # Find all possible paths
         try:
-            paths = find_all_paths(flight_graph, city_to_airports_map, departure_city, arrival_city)
+            paths = find_all_paths(flight_graph, city_airports, departure_city, arrival_city)
 
             # Get detailed information for each path
             path_details = []
