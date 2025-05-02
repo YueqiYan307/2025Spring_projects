@@ -54,7 +54,6 @@ def load_and_preprocess_data(file_path):
     city_airports = city_to_airports_map(df)
 
     print(f"Data preprocessing complete. {len(df)} flights available.")
-    print (df.head)
     return df, city_airports
 
 
