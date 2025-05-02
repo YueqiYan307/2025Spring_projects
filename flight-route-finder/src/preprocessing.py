@@ -61,7 +61,6 @@ def extract_city_names(df):
     return result_df
 
 
-
 def extract_coordinates(df):
     """
     Extracts longitude and latitude from coordinate columns and creates new columns.
@@ -257,4 +256,3 @@ def city_to_airports_map(df):
     )
 
     return mapping
-
