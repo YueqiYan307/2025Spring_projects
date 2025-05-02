@@ -8,12 +8,11 @@ Usage:
     python main.py [--data PATH_TO_DATA]
 """
 
-import os
 import sys
 import argparse
 import pandas as pd
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime
+
 from src.preprocessing import (
     extract_city_names,
     extract_coordinates,
@@ -38,15 +37,7 @@ def parse_arguments():
 
 
 def load_and_preprocess_data(file_path):
-    """
-    Load flight data from CSV and preprocess it.
-
-    Args:
-        file_path: Path to the flight data CSV file
-
-    Returns:
-        Preprocessed DataFrame and city-to-airports mapping
-    """
+    """Load flight data from CSV and preprocess it."""
     try:
         print(f"Loading flight data from {file_path}...")
         df = pd.read_csv(file_path)
@@ -75,15 +66,7 @@ def get_cities_list(city_airports):
 
 
 def get_user_input(cities):
-    """
-    Get user input for departure and arrival cities and departure date/time.
-
-    Args:
-        cities: List of available cities
-
-    Returns:
-        Tuple with (departure_city, arrival_city, departure_time)
-    """
+    """Get user input for departure and arrival cities and departure date/time."""
     while True:
         try:
             # Get departure city
