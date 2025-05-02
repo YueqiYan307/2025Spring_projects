@@ -18,6 +18,24 @@ def build_flight_graph(flights_df, departure_time):
     :param flights_df: DataFrame, preprocessed flight data
            departure_time: datetime, the earliest time a passenger can depart
     :return tuple: (networkx. MultiDiGraph, set of airport nodes)
+
+    >>> data = {
+    ...     'flight_id': ['11', '12'],
+    ...     'flight_no': ['PG1234', 'PG5678'],
+    ...     'departure_airport': ['SVO', 'LED'],
+    ...     'arrival_airport': ['LED', 'SVO'],
+    ...     'scheduled_departure': [pd.Timestamp('2023-01-01 10:00:00'), pd.Timestamp('2023-01-01 14:00:00')],
+    ...     'scheduled_arrival':   [pd.Timestamp('2023-01-01 12:00:00'), pd.Timestamp('2023-01-01 16:00:00')],
+    ...     'flight_duration_hours': [2.0, 2.25],
+    ...     'amount': [100, 120]
+    ... }
+    >>> df = pd.DataFrame(data)
+    >>> departure_time = pd.Timestamp('2023-01-01 08:00:00')
+    >>> G, airport_nodes = build_flight_graph(df, departure_time)
+    >>> len(G.edges())
+    2
+    >>> 'SVO' in airport_nodes
+    True
     """
     # Create a new directed graph
     G = nx.MultiDiGraph()
@@ -50,8 +68,6 @@ def build_flight_graph(flights_df, departure_time):
             'flight_number': flight['flight_no'],
             'scheduled_departure': flight['scheduled_departure'],
             'scheduled_arrival': flight['scheduled_arrival'],
-            'departure_time': flight['scheduled_departure'],  # 添加兼容属性
-            'arrival_time': flight['scheduled_arrival'],      # 添加兼容属性
             'duration_hours': flight['flight_duration_hours'],
             'price': flight['amount']
         }
@@ -73,6 +89,15 @@ def find_all_paths(G, city_to_airports_map, departure_city, arrival_city, max_se
            max_segments: int, default=3, Maximum number of flight segments to consider
 
     :return: List of valid paths, where each path is a list of flight edges
+
+    >>> G = nx.MultiDiGraph()
+    >>> city_to_airports_map = {'Moscow': ['SVO', 'VKO'], 'St Petersburg': ['LED'], 'Kazan': ['KZN']}
+    >>> _ = G.add_edge('SVO', 'LED', scheduled_departure=pd.Timestamp('2020-01-01 10:00'), scheduled_arrival=pd.Timestamp('2020-01-01 11:00'), price=100)
+    >>> _ = G.add_edge('VKO', 'KZN', scheduled_departure=pd.Timestamp('2020-01-01 11:30'), scheduled_arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
+    >>> _ = G.add_edge('LED', 'KZN', scheduled_departure=pd.Timestamp('2020-01-01 12:00'), scheduled_arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
+    >>> paths = find_all_paths(G, city_to_airports_map, 'Moscow', 'Kazan')
+    >>> [p for p in paths]
+    [['SVO', 'LED', 'KZN'], ['VKO', 'KZN']]
     """
     if G is None:
         raise ValueError("Flight graph not built")
@@ -134,7 +159,7 @@ def _find_time_aware_paths(G, origin_airport, dest_airport, max_segments):
             continue
 
         # Skip if path is already at max length and we're not at destination
-        if len(path_so_far) > max_segments + 1:  # +1 因为路径包含机场而不是航段
+        if len(path_so_far) > max_segments:
             continue
 
         # Process MultiDiGraph edges
@@ -154,14 +179,14 @@ def _find_time_aware_paths(G, origin_airport, dest_airport, max_segments):
 
 def get_path_details(G, path, min_layover=timedelta(hours=1)):
     """
-    Compute detailed info for a given airport‐code path, including each segment's
-    departure/arrival times & price, plus the journey's total price, total duration,
+    Compute detailed info for a given airport‐code path, including each segment’s
+    departure/arrival times & price, plus the journey’s total price, total duration,
     and number of transfers.
 
     :param G: networkx.DiGraph or MultiDiGraph
               Each edge must carry at least:
-                - 'scheduled_departure': pandas.Timestamp
-                - 'scheduled_arrival'  : pandas.Timestamp
+                - 'departure_time': pandas.Timestamp
+                - 'arrival_time'  : pandas.Timestamp
                 - 'price'         : numeric
     :param path: list of airport codes, e.g. ['A','B','C']
     :param min_layover: timedelta, minimum required time between arrival and next departure
@@ -172,6 +197,29 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
              - 'total_duration' : sum of all segment durations
              - 'transfers'      : number of connections (len(path)-2)
              or None if any segment fails the time‐connection rule.
+
+    >>> import pandas as pd
+    >>> G = nx.DiGraph()
+    >>> G.add_edge('A','B',
+    ...            departure_time=pd.Timestamp('2020-01-01T10:00:00'),
+    ...            arrival_time  =pd.Timestamp('2020-01-01T12:00:00'),
+    ...            price=100)
+    >>> G.add_edge('B','C',
+    ...            departure_time=pd.Timestamp('2020-01-01T13:30:00'),
+    ...            arrival_time  =pd.Timestamp('2020-01-01T15:00:00'),
+    ...            price=150)
+    >>> details = get_path_details(G, ['A','B','C'])
+    >>> details['total_price']
+    250
+    >>> details['transfers']
+    1
+    >>> # invalid layover (<1h) returns None
+    >>> G.add_edge('B','D',
+    ...            departure_time=pd.Timestamp('2020-01-01T12:30:00'),
+    ...            arrival_time  =pd.Timestamp('2020-01-01T13:30:00'),
+    ...            price=200)
+    >>> get_path_details(G, ['A','B','D']) is None
+    True
     """
     path_segments = []
     total_price    = 0
@@ -194,8 +242,7 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
         # pick first flight satisfying layover
         chosen = None
         for flight in candidates:
-            # 兼容两种属性命名
-            dep = flight.get('scheduled_departure', flight.get('departure_time'))
+            dep = flight.get('scheduled_departure')
             # first leg has no layover constraint
             if last_arrival is None or dep >= last_arrival + min_layover:
                 chosen = flight
@@ -206,9 +253,7 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
             return None
 
         # record this segment
-        # 兼容两种属性命名
-        dep = chosen.get('scheduled_departure', chosen.get('departure_time'))
-        arr = chosen.get('scheduled_arrival', chosen.get('arrival_time'))
+        arr = chosen.get('scheduled_arrival')
         dur = arr - dep
         path_segments.append({
             'from':      origin,
@@ -240,6 +285,20 @@ def select_best_routes(all_path_details):
                              'path', 'total_price', 'total_duration', 'transfers'
     :return: dict with keys 'cheapest', 'fastest', 'least_transfers',
              each mapping to one of the input dicts. Returns None if input is empty.
+
+    >>> from datetime import timedelta
+    >>> paths = [
+    ...     {'path': [], 'total_price': 100, 'total_duration': timedelta(hours=2),    'transfers': 1},
+    ...     {'path': [], 'total_price': 150, 'total_duration': timedelta(hours=1, minutes=30), 'transfers': 0},
+    ...     {'path': [], 'total_price':  80, 'total_duration': timedelta(hours=3),    'transfers': 2}
+    ... ]
+    >>> best = select_best_routes(paths)
+    >>> best['cheapest']['total_price']
+    80
+    >>> best['fastest']['total_duration']
+    datetime.timedelta(seconds=5400)
+    >>> best['least_transfers']['transfers']
+    0
     """
     if not all_path_details:
         return None

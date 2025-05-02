@@ -1,10 +1,14 @@
-# src/main.py
+"""
+Flight Route Finder
 
+A command-line application to find flight routes between cities using preprocessed flight data.
+This module serves as the entry point for the flight route finder application.
+"""
+
+import sys
+import argparse
 import pandas as pd
-import pytz
 from datetime import datetime
-import dateutil.parser
-import os
 
 from src.preprocessing import (
     extract_city_names,
@@ -20,141 +24,168 @@ from src.flight_functions import (
     select_best_routes
 )
 
-# 项目数据和用户输入时间都假定为莫斯科时区（UTC+03）
-DATASET_TZ = pytz.timezone("Europe/Moscow")
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Flight Route Finder')
+    parser.add_argument('--data', type=str, default='data/processed/flight_ticket_summary.csv',
+                        help='Path to the flight data file (CSV)')
+    return parser.parse_args()
+
+
+def load_and_preprocess_data(file_path):
+    """Load flight data from CSV and preprocess it."""
+    try:
+        print(f"Loading flight data from {file_path}...")
+        df = pd.read_csv(file_path)
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        sys.exit(1)
+
+    print("Preprocessing flight data...")
+
+    # Apply preprocessing functions
+    df = extract_city_names(df)
+    df = extract_coordinates(df)
+    df = process_time_columns(df)
+    df = fill_missing_amount_by_route_type(df)
+
+    # Create city to airports mapping
+    city_airports = city_to_airports_map(df)
+
+    print(f"Data preprocessing complete. {len(df)} flights available.")
+    print (df.head)
+    return df, city_airports
+
+
+def get_cities_list(city_airports):
+    """Return sorted list of available cities."""
+    return sorted(city_airports.keys())
+
+
+def get_user_input(cities):
+    """Get user input for departure and arrival cities and departure date/time."""
+    while True:
+        try:
+            # Get departure city
+            departure_city = input("\nDeparture city: ")
+
+            # Get arrival city
+            arrival_city = input("Arrival city: ")
+
+            # Validate city selections
+            if departure_city not in cities:
+                print(f"Error: '{departure_city}' is not in the available cities list.")
+                continue
+
+            if arrival_city not in cities:
+                print(f"Error: '{arrival_city}' is not in the available cities list.")
+                continue
+
+            if departure_city == arrival_city:
+                print("Error: Departure and arrival cities cannot be the same.")
+                continue
+
+            # Get departure date and time
+            date_str = input("Departure date (YYYY-MM-DD, default: today): ")
+            time_str = input("Departure time (HH:MM, default: now): ")
+
+            # Use current date/time as default
+            now = datetime.now()
+            if not date_str:
+                date_str = now.strftime("%Y-%m-%d")
+            if not time_str:
+                time_str = now.strftime("%H:%M")
+
+            # Parse date and time
+            try:
+                departure_time = pd.Timestamp(f"{date_str} {time_str}").tz_localize('UTC+03:00')
+            except:
+                print("Invalid date or time format. Please use YYYY-MM-DD for date and HH:MM for time.")
+                continue
+
+            # All inputs are valid
+            return departure_city, arrival_city, departure_time
+
+        except KeyboardInterrupt:
+            print("\nOperation cancelled.")
+            sys.exit(0)
+
+
+def display_route(route_type, route_details):
+    """Display a single route with all details."""
+    print(f"\n{route_type.upper()} ROUTE:")
+    print(f"  Total price: ${route_details['total_price']:.2f}")
+    print(f"  Total duration: {route_details['total_duration']}")
+    print(f"  Transfers: {route_details['transfers']}")
+
+    print("\n  Flight segments:")
+    for i, segment in enumerate(route_details['path'], 1):
+        print(f"  {i}. {segment['from']} → {segment['to']}")
+        print(f"     Departure: {segment['departure']}")
+        print(f"     Arrival: {segment['arrival']}")
+        print(f"     Price: ${segment['price']:.2f}")
+
+
+def display_results(best_routes):
+    """Display the best routes found."""
+    if not best_routes:
+        print("\nNo routes found. Try different cities or departure time.")
+        return
+
+    for route_type, route_details in best_routes.items():
+        display_route(route_type, route_details)
 
 
 def main():
-    # 1) 交互式获取输入
-    origin = input("Departure city (English): ").strip()
-    destination = input("Arrival city (English): ").strip()
-    user_time = input('Current time (UTC+03), e.g. "2025-05-02 15:30": ').strip()
-    current_city = input(f"Current city (default = {origin}): ").strip() or origin
+    """Main function for the flight route finder application."""
+    print("=" * 60)
+    print("             FLIGHT ROUTE FINDER")
+    print("=" * 60)
 
-    default_csv = "data/processed/flight_ticket_summary.csv"
-    data_file = input(f"Path to flight_ticket_summary.csv [default: {default_csv}]: ").strip() or default_csv
+    # Parse command line arguments
+    args = parse_arguments()
 
-    # 检查文件是否存在
-    if not os.path.exists(data_file):
-        print(f"错误: 找不到文件 '{data_file}'")
-        return
+    # Load and preprocess flight data
+    df, city_airports = load_and_preprocess_data(args.data)
 
-    seg_input = input("Max number of flight segments (hops) [default: 3]: ").strip()
-    try:
-        max_segments = int(seg_input) if seg_input else 3
-    except ValueError:
-        print("Invalid number for max segments, using default 3.")
-        max_segments = 3
+    while True:
+        # Get list of cities
+        cities = get_cities_list(city_airports)
 
-    print("\n正在处理数据，请稍候...\n")
+        # Get user input
+        departure_city, arrival_city, departure_time = get_user_input(cities)
 
-    try:
-        # 2) 读取预处理后的 CSV
-        df = pd.read_csv(data_file)
+        print(f"\nSearching for routes from {departure_city} to {arrival_city} on {departure_time}...")
 
-        # 3) 数据预处理流水线
-        df = extract_city_names(df)
-        df = extract_coordinates(df)
-        df = process_time_columns(df)
-        df = fill_missing_amount_by_route_type(df)
+        # Build flight graph
+        flight_graph, airport_nodes = build_flight_graph(df, departure_time)
 
-        # 4) 构建城市↔机场映射
-        city_map = city_to_airports_map(df)
-
-        # 检查输入城市是否存在于数据中
-        if origin not in city_map:
-            print(f"错误: 出发城市 '{origin}' 在数据中找不到。")
-            print(f"可用的城市有: {', '.join(sorted(city_map.keys())[:10])}等")
-            return
-
-        if destination not in city_map:
-            print(f"错误: 目的地城市 '{destination}' 在数据中找不到。")
-            print(f"可用的城市有: {', '.join(sorted(city_map.keys())[:10])}等")
-            return
-
-        # 5) 解析用户输入时间（假设已是 UTC+03）
+        # Find all possible paths
         try:
-            dep_time = dateutil.parser.parse(user_time)
-            if dep_time.tzinfo is None:
-                dep_time = DATASET_TZ.localize(dep_time)
-            else:
-                dep_time = dep_time.astimezone(DATASET_TZ)
-        except Exception as e:
-            print(f"错误: 无法解析时间 '{user_time}'. 请使用格式 'YYYY-MM-DD HH:MM'")
-            return
+            paths = find_all_paths(flight_graph, city_to_airports_map, departure_city, arrival_city)
 
-        print(f"正在查找从 {origin} 到 {destination} 的航班路线...")
+            # Get detailed information for each path
+            path_details = []
+            for path in paths:
+                details = get_path_details(flight_graph, path)
+                if details:
+                    path_details.append(details)
 
-        # 6) 构建航班图（只保留起飞时间 >= dep_time 的航班）
-        G, airport_nodes = build_flight_graph(df, dep_time)
+            # Select the best routes
+            best_routes = select_best_routes(path_details)
 
-        if not G.number_of_edges():
-            print(f"没有找到任何在 {dep_time} 之后起飞的航班。")
-            return
+            # Display results
+            display_results(best_routes)
 
-        # 7) 查找所有可行机场路径
-        paths = find_all_paths(
-            G,
-            city_to_airports_map=city_map,
-            departure_city=origin,
-            arrival_city=destination,
-            max_segments=max_segments
-        )
+        except ValueError as e:
+            print(f"Error: {e}")
 
-        if not paths:
-            print(f"\n没有找到从 {origin} 到 {destination} 的路线 (最多 {max_segments} 段航班)。")
-            print("尝试增加最大航段数或选择不同的城市。")
-            return
+        # Ask if user wants to search again
+        if input("\nSearch for another route? (y/n): ").lower() != 'y':
+            break
 
-        print(f"找到 {len(paths)} 条可能的路径，正在分析最佳选择...")
-
-        # 8) 计算每条路径详情并过滤无效项
-        details = [get_path_details(G, p) for p in paths]
-        details = [d for d in details if d is not None]
-
-        if not details:
-            print("\n没有找到满足中转时间要求的有效路线。")
-            return
-
-        # 9) 选出三种最优路线
-        best = select_best_routes(details)
-        if best is None:
-            print("\n没有找到有效路线。")
-            return
-
-        # 10) 打印结果
-        print("\n=== 推荐路线 ===\n")
-
-        # 打印最便宜路线
-        print("最便宜路线:")
-        print(f"  总价: {best['cheapest']['total_price']} 卢布")
-        print(f"  总时长: {best['cheapest']['total_duration']}")
-        print(f"  中转次数: {best['cheapest']['transfers']}")
-        print("  路线详情:")
-        for seg in best['cheapest']['path']:
-            print(
-                f"    {seg['from']} → {seg['to']}: 出发 {seg['departure']}, 到达 {seg['arrival']}, 价格 {seg['price']} 卢布")
-
-        print("\n最快路线:")
-        print(f"  总价: {best['fastest']['total_price']} 卢布")
-        print(f"  总时长: {best['fastest']['total_duration']}")
-        print(f"  中转次数: {best['fastest']['transfers']}")
-        print("  路线详情:")
-        for seg in best['fastest']['path']:
-            print(
-                f"    {seg['from']} → {seg['to']}: 出发 {seg['departure']}, 到达 {seg['arrival']}, 价格 {seg['price']} 卢布")
-
-        print("\n最少中转路线:")
-        print(f"  总价: {best['least_transfers']['total_price']} 卢布")
-        print(f"  总时长: {best['least_transfers']['total_duration']}")
-        print(f"  中转次数: {best['least_transfers']['transfers']}")
-        print("  路线详情:")
-        for seg in best['least_transfers']['path']:
-            print(
-                f"    {seg['from']} → {seg['to']}: 出发 {seg['departure']}, 到达 {seg['arrival']}, 价格 {seg['price']} 卢布")
-
-    except Exception as e:
-        print(f"程序运行出错: {e}")
+    print("Thank you for using Flight Route Finder!")
 
 
 if __name__ == "__main__":
