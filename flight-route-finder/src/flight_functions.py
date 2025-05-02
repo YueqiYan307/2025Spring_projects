@@ -16,8 +16,8 @@ def build_flight_graph(flights_df, departure_time):
     Build a directed graph of flights that occur after the specified departure time.
 
     :param flights_df: DataFrame, preprocessed flight data
-           departure_time : datetime, the earliest time a passenger can depart
-    :return tuple: (networkx.DiGraph, set of airport nodes)
+           departure_time: datetime, the earliest time a passenger can depart
+    :return tuple: (networkx. MultiDiGraph, set of airport nodes)
 
     >>> data = {
     ...     'flight_id': ['11', '12'],
@@ -38,7 +38,7 @@ def build_flight_graph(flights_df, departure_time):
     True
     """
     # Create a new directed graph
-    G = nx.DiGraph()
+    G = nx.MultiDiGraph()
     airport_nodes = set()
 
     # Filter flights by scheduled departure time
@@ -66,37 +66,38 @@ def build_flight_graph(flights_df, departure_time):
         edge_attrs = {
             'flight_id': flight['flight_id'],
             'flight_number': flight['flight_no'],
+            'scheduled_departure': flight['scheduled_departure'],
             'scheduled_arrival': flight['scheduled_arrival'],
             'duration_hours': flight['flight_duration_hours'],
             'price': flight['amount']
         }
 
         # Add edge with flight attributes
-        G.add_edge(departure_airport, arrival_airport, **edge_attrs)
+        G.add_edge(departure_airport, arrival_airport, key=flight['flight_id'], **edge_attrs)
 
     return G, airport_nodes
 
 
-def find_all_paths(G, city_to_airports_map, departure, arrival, max_segments=3):
+def find_all_paths(G, city_to_airports_map, departure_city, arrival_city, max_segments=3):
     """
     Find all possible paths from origin city to destination city.
 
-    :param G: networkx.DiGraph, Flight graph
+    :param G: networkx.MultiDiGraph, Flight graph from build_flight_graph function
            city_to_airports_map: dict, Mapping of cities to their airport codes
-           departure: str, origin city
-           arrival: str, destination city
+           departure_city: str, origin city
+           arrival_city: str, destination city
            max_segments: int, default=3, Maximum number of flight segments to consider
 
     :return: List of valid paths, where each path is a list of flight edges
 
-    >>> G = nx.DiGraph()
+    >>> G = nx.MultiDiGraph()
     >>> city_to_airports_map = {'Moscow': ['SVO', 'VKO'], 'St Petersburg': ['LED'], 'Kazan': ['KZN']}
-    >>> G.add_edge('SVO', 'LED', departure=pd.Timestamp('2020-01-01 10:00'), arrival=pd.Timestamp('2020-01-01 11:00'), price=100)
-    >>> G.add_edge('VKO', 'KZN', departure=pd.Timestamp('2020-01-01 11:30'), arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
-    >>> G.add_edge('LED', 'KZN', departure=pd.Timestamp('2020-01-01 12:00'), arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
+    >>> _ = G.add_edge('SVO', 'LED', scheduled_departure=pd.Timestamp('2020-01-01 10:00'), scheduled_arrival=pd.Timestamp('2020-01-01 11:00'), price=100)
+    >>> _ = G.add_edge('VKO', 'KZN', scheduled_departure=pd.Timestamp('2020-01-01 11:30'), scheduled_arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
+    >>> _ = G.add_edge('LED', 'KZN', scheduled_departure=pd.Timestamp('2020-01-01 12:00'), scheduled_arrival=pd.Timestamp('2020-01-01 13:00'), price=200)
     >>> paths = find_all_paths(G, city_to_airports_map, 'Moscow', 'Kazan')
     >>> [p for p in paths]
-    [['VKO', 'KZN'], ['SVO', 'LED', 'KZN']]
+    [['SVO', 'LED', 'KZN'], ['VKO', 'KZN']]
     """
     if G is None:
         raise ValueError("Flight graph not built")
@@ -105,14 +106,14 @@ def find_all_paths(G, city_to_airports_map, departure, arrival, max_segments=3):
         raise ValueError("City to airports mapping not provided")
 
     # Get all airports for origin and destination cities
-    origin_airports = city_to_airports_map.get(departure, [])
-    dest_airports = city_to_airports_map.get(arrival, [])
+    origin_airports = city_to_airports_map.get(departure_city, [])
+    dest_airports = city_to_airports_map.get(arrival_city, [])
 
     if not origin_airports:
-        raise ValueError(f"No airports found for origin city: {departure}")
+        raise ValueError(f"No airports found for origin city: {departure_city}")
 
     if not dest_airports:
-        raise ValueError(f"No airports found for destination city: {arrival}")
+        raise ValueError(f"No airports found for destination city: {arrival_city}")
 
     all_paths = []
 
@@ -135,14 +136,10 @@ def _find_time_aware_paths(G, origin_airport, dest_airport, max_segments):
     Find all time-constrained paths between two airports.
     This respects the temporal sequence of flights (connection causality).
 
-    :param G : networkx.DiGraph
-           Flight graph
+    :param G: networkx.MultiDiGraph, flight graph from build_flight_graph function
            origin_airport : str
-           Origin airport code
            dest_airport : str
-           Destination airport code
-           max_segments : int
-           Maximum number of flight segments
+           max_segments : int, maximum number of flight segments
 
     :return: List of valid paths with flight details
     """
@@ -150,45 +147,35 @@ def _find_time_aware_paths(G, origin_airport, dest_airport, max_segments):
         return []
 
     # Use a modified BFS to find valid paths
-    queue = [(origin_airport, [], None)]  # (airport, path_so_far, last_arrival_time)
+    queue = [(origin_airport, [origin_airport], None)]  # (airport, path_so_far, last_arrival_time)
     valid_paths = []
 
     while queue:
         current_airport, path_so_far, last_arrival_time = queue.pop(0)
 
-        # Skip if path is too long
-        if len(path_so_far) >= max_segments:
-            # If we're at destination, add to valid paths
-            if current_airport == dest_airport and path_so_far:
-                valid_paths.append(path_so_far)
+        # If we're at destination, add to valid paths
+        if current_airport == dest_airport and path_so_far[0] == origin_airport:
+            valid_paths.append(path_so_far)
             continue
 
-        # Explore next possible flights
-        for neighbor in G.successors(current_airport):
-            # Get all edges (flights) between current and neighbor
-            edges = G.get_edge_data(current_airport, neighbor)
+        # Skip if path is already at max length and we're not at destination
+        if len(path_so_far) > max_segments:
+            continue
 
-            # There might be multiple flights between the same airports
-            for flight_id, flight_data in edges.items():
-                departure_time = flight_data['departure_time']
+        # Process MultiDiGraph edges
+        for neighbor, edge_dict in G.adj[current_airport].items():
+            for edge_key, flight_data in edge_dict.items():
+                # Get departure and arrival times
+                departure_time = flight_data.get('scheduled_departure')
+                arrival_time = flight_data.get('scheduled_arrival')
 
                 # Check if this flight departs after previous flight's arrival
-                # (respecting connection time)
                 if last_arrival_time is None or departure_time > last_arrival_time:
-                    new_path = path_so_far + [(current_airport, neighbor, flight_data)]
-
-                    # If reached destination, add to valid paths
-                    if neighbor == dest_airport:
-                        valid_paths.append(new_path)
-                    else:
-                        # Continue searching from this airport
-                        queue.append((neighbor, new_path, flight_data['arrival_time']))
+                    new_path = path_so_far + [neighbor]
+                    queue.append((neighbor, new_path, arrival_time))
 
     return valid_paths
 
-
-from datetime import timedelta
-import networkx as nx
 
 def get_path_details(G, path, min_layover=timedelta(hours=1)):
     """
@@ -286,8 +273,6 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
         'transfers':      len(path) - 2
     }
 
-
-from datetime import timedelta
 
 def select_best_routes(all_path_details):
     """
