@@ -1,3 +1,4 @@
+# user应该输入四个变量，出发地目的地，目前所在地，目前所在地的时间
 def standardize_user_time(time_str: str, user_tz_str: str):
     """
     Parses a user-provided time string and timezone, returning a UTC datetime object.
