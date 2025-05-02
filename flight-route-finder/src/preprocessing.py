@@ -218,27 +218,43 @@ def fill_missing_amount_by_route_type(df):
 
 def city_to_airports_map(df):
     """
-    Builds a dictionary mapping each English city name to a list of its associated departure airport codes.
+    Builds a mapping from English city names to all associated airport codes.
 
-    :param df: DataFrame that contains 'departure_city_name' and 'departure_airport'
-    :return: Dictionary {city_name: [airport_code1, airport_code2, ...]}
+    :param df: DataFrame with columns:
+               - 'departure_city_name', 'departure_airport'
+               - 'arrival_city_name', 'arrival_airport'
+    :return: Dictionary {city_name: [airport1, airport2, ...]}
 
     >>> df_test = pd.DataFrame({
-    ...     'departure_city_name': ['Moscow', 'Moscow', 'Sochi'],
-    ...     'departure_airport': ['SVO', 'DME', 'AER']
+    ...     'departure_city_name': ['Moscow', 'Beijing'],
+    ...     'departure_airport': ['A', 'B'],
+    ...     'arrival_city_name': ['Beijing', 'Moscow'],
+    ...     'arrival_airport': ['C', 'D']
     ... })
-    >>> city_airport_map = city_to_airports_map(df_test.copy())
-    >>> sorted(city_airport_map['Moscow'])
-    ['DME', 'SVO']
-    >>> city_airport_map['Sochi']
-    ['AER']
+    >>> mapping = city_to_airports_map(df_test)
+    >>> sorted(mapping['Moscow'])
+    ['A', 'D']
+    >>> sorted(mapping['Beijing'])
+    ['B', 'C']
     """
-    result_df = df.copy()
+    # Select relevant columns for departure/arrival city-airport pairs and drop any rows with missing values
+    dep = df[['departure_city_name', 'departure_airport']].dropna()
+    arr = df[['arrival_city_name', 'arrival_airport']].dropna()
+
+    # Rename both DataFrames to have the same column names for easy merging
+    dep.columns = ['city', 'airport']
+    arr.columns = ['city', 'airport']
+
+    # Combine departure and arrival records into a single DataFrame and remove duplicates
+    combined = pd.concat([dep, arr], ignore_index=True).drop_duplicates()
+
+    # Group by city and collect all unique associated airports, sorted alphabetically
     mapping = (
-        result_df.groupby('departure_city_name')['departure_airport']
+        combined.groupby('city')['airport']
         .unique()
-        .dropna()
-        .apply(list)
+        .apply(sorted)
         .to_dict()
     )
+
     return mapping
+
