@@ -1,10 +1,9 @@
 # Flight Route Optimizer
-A Python application that finds optimal flight routes based on different criteria: cheapest price, fewest transfers, and minimum flight duration.
 ## Team Members
 - [Zijing Ye](https://github.com/Yeahzz929)   
 - [Yueqi Yan](https://github.com/YueqiYan307)   
 ## Project Overview
-This application processes flight data and provides route recommendations based on user inputs. It handles multilingual city names, accounts for time zones, and ensures proper connection times between flights.
+Flight Route Optimizer is a Python CLI tool that loads Russian flight operation and ticket data, builds a route graph, and recommends itineraries ranked by lowest price, fewest transfers, or shortest total duration. 
 ## Dataset
 This project uses flight data from Kaggle: https://www.kaggle.com/datasets/saadharoon27/airlines-dataset/data. 
 
@@ -70,8 +69,8 @@ Example CLI session:
 
 
 ## Future Enhancements
-- Real‑time integration of online flight data and ticket pricing  
-- Support additional optimization criteria, such as minimum carbon emissions and lowest total distance  
+- Real‑time integration of online flight data and ticket pricing    
 - Integrate a graphical user interface or web application to enhance user experience  
-- Consider factors such as the user’s journey to the departure airport (e.g., driving time and fuel cost) when recommending optimal routes  
+- Consider factors such as the user’s journey to the departure airport (e.g., driving time and fuel cost) when recommending optimal routes
+- Add timezone conversion support—translate users’ local departure times into a unified UTC baseline for accurate scheduling    
   
