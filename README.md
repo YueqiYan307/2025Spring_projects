@@ -15,7 +15,8 @@ The dataset is stored as a SQLite database containing 8 tables, covering flight 
 
 - ticket_flights – ticket price data
 ### Visualization
-We performed an initial visualization of the flight network (see `flight_network.png`):  
+We performed an initial visualization of the flight network:  
+![Flight Network](flight_network.png)
 - Node size & color: weighted by flight count (yellow = busiest)   
 - Highlights hubs (e.g. SVO, DME) with highest connectivity and regional clusters reflecting route density
 
@@ -65,7 +66,27 @@ In `main.py`:
 6. Prompt to continue or exit  
 
 ## Results
-Example CLI session:
+#### 1. User Input
+![User Input Prompt](result_input.png)  
+*Interactive prompt where the user enters departure city, arrival city, departure date and time.*
+
+---
+
+#### 2. Cheapest Route
+![Cheapest Route Result](result_CheapestRoute.png)  
+*Cheapest route showing total price, total duration, number of transfers, and each flight segment’s departure/arrival times and prices.*
+
+---
+
+#### 3. Fastest Route
+![Fastest Route Result](result_FatestRoute.png)  
+*Fastest route highlighting the shortest total travel time, along with price, transfers count, and detailed segments.*
+
+---
+
+#### 4. Least Transfers Route
+![Least Transfers Route Result](result_LeastTransfersRoute.png)  
+*Route with the fewest connections, displaying price, duration, and each segment for minimal layovers.*
 
 
 ## Future Enhancements
