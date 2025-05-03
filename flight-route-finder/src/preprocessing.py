@@ -141,11 +141,11 @@ def process_time_columns(df):
 
     result_df = df.copy()
 
-    # 转换时间为 datetime 类型
+    # Converts time to datetime type
     result_df['scheduled_departure'] = pd.to_datetime(result_df['scheduled_departure'], errors='coerce')
     result_df['scheduled_arrival'] = pd.to_datetime(result_df['scheduled_arrival'], errors='coerce')
 
-    # 计算飞行时长（单位：小时）
+    # Calculate flight duration in hours
     result_df['flight_duration_hours'] = (
         (result_df['scheduled_arrival'] - result_df['scheduled_departure']).dt.total_seconds() / 3600
     )
@@ -169,7 +169,6 @@ def fill_missing_amount_by_route_type(df):
                - 'amount'
     :return df: A cleaned DataFrame with all missing 'amount' values handled.
 
-    >>> import numpy as np
     >>> df_test = pd.DataFrame({
     ...     'departure_airport': ['A', 'A', 'A', 'B', 'B', 'C'],
     ...     'arrival_airport':   ['X', 'X', 'X', 'Y', 'Y', 'Z'],

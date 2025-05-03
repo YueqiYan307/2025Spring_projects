@@ -150,8 +150,17 @@ def _find_time_aware_paths(G, origin_airport, dest_airport, max_segments):
     queue = [(origin_airport, [origin_airport], None)]  # (airport, path_so_far, last_arrival_time)
     valid_paths = []
 
+    # A state is a combination of (airport, last_arrival_time)
+    visited = set()
+
     while queue:
         current_airport, path_so_far, last_arrival_time = queue.pop(0)
+
+        # Create a state identifier for the visited set
+        state = (current_airport, last_arrival_time)
+        if state in visited:
+            continue
+        visited.add(state)
 
         # If we're at destination, add to valid paths
         if current_airport == dest_airport and path_so_far[0] == origin_airport:
@@ -183,7 +192,7 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
     departure/arrival times & price, plus the journey’s total price, total duration,
     and number of transfers.
 
-    :param G: networkx.DiGraph or MultiDiGraph
+    :param G: networkx.MultiDiGraph
               Each edge must carry at least:
                 - 'departure_time': pandas.Timestamp
                 - 'arrival_time'  : pandas.Timestamp
@@ -198,15 +207,14 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
              - 'transfers'      : number of connections (len(path)-2)
              or None if any segment fails the time‐connection rule.
 
-    >>> import pandas as pd
-    >>> G = nx.DiGraph()
-    >>> G.add_edge('A','B',
-    ...            departure_time=pd.Timestamp('2020-01-01T10:00:00'),
-    ...            arrival_time  =pd.Timestamp('2020-01-01T12:00:00'),
+    >>> G = nx. MultiDiGraph()
+    >>> _ = G.add_edge('A','B',
+    ...            scheduled_departure=pd.Timestamp('2020-01-01T10:00:00'),
+    ...            scheduled_arrival=pd.Timestamp('2020-01-01T12:00:00'),
     ...            price=100)
-    >>> G.add_edge('B','C',
-    ...            departure_time=pd.Timestamp('2020-01-01T13:30:00'),
-    ...            arrival_time  =pd.Timestamp('2020-01-01T15:00:00'),
+    >>> _ = G.add_edge('B','C',
+    ...            scheduled_departure=pd.Timestamp('2020-01-01T13:30:00'),
+    ...            scheduled_arrival=pd.Timestamp('2020-01-01T15:00:00'),
     ...            price=150)
     >>> details = get_path_details(G, ['A','B','C'])
     >>> details['total_price']
@@ -214,9 +222,9 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
     >>> details['transfers']
     1
     >>> # invalid layover (<1h) returns None
-    >>> G.add_edge('B','D',
-    ...            departure_time=pd.Timestamp('2020-01-01T12:30:00'),
-    ...            arrival_time  =pd.Timestamp('2020-01-01T13:30:00'),
+    >>> _ = G.add_edge('B','D',
+    ...            scheduled_departure=pd.Timestamp('2020-01-01T12:30:00'),
+    ...            scheduled_arrival=pd.Timestamp('2020-01-01T13:30:00'),
     ...            price=200)
     >>> get_path_details(G, ['A','B','D']) is None
     True
@@ -286,7 +294,6 @@ def select_best_routes(all_path_details):
     :return: dict with keys 'cheapest', 'fastest', 'least_transfers',
              each mapping to one of the input dicts. Returns None if input is empty.
 
-    >>> from datetime import timedelta
     >>> paths = [
     ...     {'path': [], 'total_price': 100, 'total_duration': timedelta(hours=2),    'transfers': 1},
     ...     {'path': [], 'total_price': 150, 'total_duration': timedelta(hours=1, minutes=30), 'transfers': 0},
