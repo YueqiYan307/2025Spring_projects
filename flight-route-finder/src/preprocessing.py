@@ -13,9 +13,14 @@ This module handles the preprocessing of flight data tables including:
 import pandas as pd
 import numpy as np
 import ast
+from typing import Dict, List
 
 
-def extract_city_names(df):
+def extract_city_names(
+    df: pd.DataFrame,
+    dep_col: str = 'departure_city',
+    arr_col: str = 'arrival_city'
+) -> pd.DataFrame:
     """
     Extracts English city names from specified columns containing dictionary-like strings.
     Creates new columns 'departure_city' and 'arrival_city'.
@@ -55,13 +60,13 @@ def extract_city_names(df):
         except (ValueError, SyntaxError, TypeError):
             return None
 
-    result_df['departure_city_name'] = result_df['departure_city'].apply(parse_and_extract)
-    result_df['arrival_city_name'] = result_df['arrival_city'].apply(parse_and_extract)
+    result_df['departure_city_name'] = result_df[dep_col].apply(parse_and_extract)
+    result_df['arrival_city_name'] = result_df[arr_col].apply(parse_and_extract)
 
     return result_df
 
 
-def extract_coordinates(df):
+def extract_coordinates(df: pd.DataFrame) -> pd.DataFrame:
     """
     Extracts longitude and latitude from coordinate columns and creates new columns.
 
@@ -121,7 +126,11 @@ def extract_coordinates(df):
     return result_df
 
 
-def process_time_columns(df):
+def process_time_columns(
+    df: pd.DataFrame,
+    dep_col: str = 'scheduled_departure',
+    arr_col: str = 'scheduled_arrival'
+) -> pd.DataFrame:
     """
     Converts time-related string columns to datetime format and computes flight duration in hours.
 
@@ -142,18 +151,18 @@ def process_time_columns(df):
     result_df = df.copy()
 
     # Converts time to datetime type
-    result_df['scheduled_departure'] = pd.to_datetime(result_df['scheduled_departure'], errors='coerce')
-    result_df['scheduled_arrival'] = pd.to_datetime(result_df['scheduled_arrival'], errors='coerce')
+    result_df[dep_col] = pd.to_datetime(result_df[dep_col], errors='coerce')
+    result_df[arr_col] = pd.to_datetime(result_df[arr_col], errors='coerce')
 
     # Calculate flight duration in hours
     result_df['flight_duration_hours'] = (
-        (result_df['scheduled_arrival'] - result_df['scheduled_departure']).dt.total_seconds() / 3600
+        (result_df[arr_col] - result_df[dep_col]).dt.total_seconds() / 3600
     )
 
     return result_df
 
 
-def fill_missing_amount_by_route_type(df):
+def fill_missing_amount_by_route_type(df: pd.DataFrame) -> pd.DataFrame:
     """
     Fills missing 'amount' values based on route type (core vs. niche):
     - For core routes (those with flight_id count >= average), missing values are filled using the route's mean amount.
@@ -214,7 +223,7 @@ def fill_missing_amount_by_route_type(df):
     return result_df
 
 
-def city_to_airports_map(df):
+def city_to_airports_map(df: pd.DataFrame) -> Dict[str, List[str]]:
     """
     Builds a mapping from English city names to all associated airport codes.
 

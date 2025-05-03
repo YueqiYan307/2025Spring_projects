@@ -6,9 +6,8 @@ find paths based on different criteria using a functional approach.
 """
 
 import networkx as nx
-from datetime import datetime, timedelta
+from datetime import timedelta
 import pandas as pd
-import pytz
 
 
 def build_flight_graph(flights_df, departure_time):
