@@ -1,4 +1,4 @@
-# Flight Route Optimizer
+# Flight Route Finder
 ## Team Members
 - [Zijing Ye](https://github.com/Yeahzz929)   
 - [Yueqi Yan](https://github.com/YueqiYan307)   
