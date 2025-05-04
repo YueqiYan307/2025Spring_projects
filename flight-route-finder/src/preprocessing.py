@@ -136,8 +136,8 @@ def process_time_columns(
 
     :param df: DataFrame with 'scheduled_departure' and 'scheduled_arrival' columns
     :return df: Updated DataFrame with:
-                - datetime-converted departure and arrival columns
-                - flight_duration_hours (as float)
+                datetime-converted departure and arrival columns
+                flight_duration_hours (as float)
 
     >>> df_test = pd.DataFrame({
     ...     'scheduled_departure': ['2017-09-02 08:55:00+03', '2017-09-02 12:00:00+03'],
@@ -172,10 +172,10 @@ def fill_missing_amount_by_route_type(df: pd.DataFrame) -> pd.DataFrame:
     Core routes are considered frequent routes, while niche routes are considered infrequent based on the number of unique flight IDs.
 
     :param df: DataFrame containing at least the following columns:
-               - 'departure_airport'
-               - 'arrival_airport'
-               - 'flight_id'
-               - 'amount'
+               departure_airport
+               arrival_airport
+               flight_id
+               amount
     :return df: A cleaned DataFrame with all missing 'amount' values handled.
 
     >>> df_test = pd.DataFrame({
@@ -192,7 +192,7 @@ def fill_missing_amount_by_route_type(df: pd.DataFrame) -> pd.DataFrame:
     """
 
     result_df = df.copy()
-
+    # this part got help from Chatgpt
     # Define route as the combination of departure and arrival airports
     result_df['route'] = result_df['departure_airport'] + ' → ' + result_df['arrival_airport']
 

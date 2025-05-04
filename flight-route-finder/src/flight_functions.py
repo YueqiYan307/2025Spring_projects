@@ -193,17 +193,17 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
 
     :param G: networkx.MultiDiGraph
               Each edge must carry at least:
-                - 'departure_time': pandas.Timestamp
-                - 'arrival_time'  : pandas.Timestamp
-                - 'price'         : numeric
+                departure_time: pandas.Timestamp
+                arrival_time  : pandas.Timestamp
+                price         : numeric
     :param path: list of airport codes, e.g. ['A','B','C']
     :param min_layover: timedelta, minimum required time between arrival and next departure
 
     :return: dict with:
-             - 'path'           : list of segment‐dicts
-             - 'total_price'    : sum of all segment prices
-             - 'total_duration' : sum of all segment durations
-             - 'transfers'      : number of connections (len(path)-2)
+             path           : list of segment‐dicts
+             total_price    : sum of all segment prices
+             total_duration : sum of all segment durations
+             transfers      : number of connections (len(path)-2)
              or None if any segment fails the time‐connection rule.
 
     >>> G = nx. MultiDiGraph()
@@ -285,9 +285,9 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
 def select_best_routes(all_path_details):
     """
     Select three optimal routes from a list of path detail dicts:
-      - 'cheapest': the route with minimal total_price
-      - 'fastest': the route with minimal total_duration
-      - 'least_transfers': the route with minimal transfers
+      cheapest: the route with minimal total_price
+      fastest: the route with minimal total_duration
+      least_transfers: the route with minimal transfers
 
     :param all_path_details: list of dicts, each dict must contain keys:
                              'path', 'total_price', 'total_duration', 'transfers'
