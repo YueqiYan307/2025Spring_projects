@@ -234,6 +234,7 @@ def get_path_details(G, path, min_layover=timedelta(hours=1)):
     last_arrival   = None
 
     # walk through each hop in the given airport list
+    # this part got help from ChatGPT
     for origin, dest in zip(path, path[1:]):
         data = G.get_edge_data(origin, dest)
         if data is None:
