@@ -146,6 +146,7 @@ def _find_time_aware_paths(G, origin_airport, dest_airport, max_segments):
         return []
 
     # Use a modified BFS to find valid paths
+    # Asked chatgpt about the BFS algorithm
     queue = [(origin_airport, [origin_airport], None)]  # (airport, path_so_far, last_arrival_time)
     valid_paths = []
 

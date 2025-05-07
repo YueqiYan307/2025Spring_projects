@@ -16,11 +16,7 @@ import ast
 from typing import Dict, List
 
 
-def extract_city_names(
-    df: pd.DataFrame,
-    dep_col: str = 'departure_city',
-    arr_col: str = 'arrival_city'
-) -> pd.DataFrame:
+def extract_city_names(df, dep_col: str = 'departure_city', arr_col: str = 'arrival_city'):
     """
     Extracts English city names from specified columns containing dictionary-like strings.
     Creates new columns 'departure_city' and 'arrival_city'.
@@ -66,7 +62,7 @@ def extract_city_names(
     return result_df
 
 
-def extract_coordinates(df: pd.DataFrame) -> pd.DataFrame:
+def extract_coordinates(df):
     """
     Extracts longitude and latitude from coordinate columns and creates new columns.
 
@@ -126,11 +122,7 @@ def extract_coordinates(df: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 
-def process_time_columns(
-    df: pd.DataFrame,
-    dep_col: str = 'scheduled_departure',
-    arr_col: str = 'scheduled_arrival'
-) -> pd.DataFrame:
+def process_time_columns(df, dep_col: str = 'scheduled_departure', arr_col: str = 'scheduled_arrival'):
     """
     Converts time-related string columns to datetime format and computes flight duration in hours.
 
@@ -162,7 +154,7 @@ def process_time_columns(
     return result_df
 
 
-def fill_missing_amount_by_route_type(df: pd.DataFrame) -> pd.DataFrame:
+def fill_missing_amount_by_route_type(df):
     """
     Fills missing 'amount' values based on route type (core vs. niche):
     - For core routes (those with flight_id count >= average), missing values are filled using the route's mean amount.
@@ -223,7 +215,7 @@ def fill_missing_amount_by_route_type(df: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 
-def city_to_airports_map(df: pd.DataFrame) -> Dict[str, List[str]]:
+def city_to_airports_map(df):
     """
     Builds a mapping from English city names to all associated airport codes.
 
