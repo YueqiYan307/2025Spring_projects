@@ -9,6 +9,8 @@ import sys
 import argparse
 import pandas as pd
 from datetime import datetime
+import re
+import difflib
 
 from src.preprocessing import (
     extract_city_names,
@@ -23,6 +25,22 @@ from src.flight_functions import (
     get_path_details,
     select_best_routes
 )
+
+
+def match_city(input_city, cities):
+    """Case-insensitive and fuzzy match of input_city to cities list."""
+    # Normalize: lowercase and remove non-letter characters
+    input_norm = re.sub(r'[^a-z]', '', input_city.strip().lower())
+    # Map normalized city keys to original names
+    city_map = {re.sub(r'[^a-z]', '', city.lower()): city for city in cities}
+    # Exact normalized match
+    if input_norm in city_map:
+        return city_map[input_norm]
+    # Fuzzy match on normalized keys
+    close = difflib.get_close_matches(input_norm, city_map.keys(), n=1, cutoff=0.7)
+    if close:
+        return city_map[close[0]]
+    return None
 
 
 def parse_arguments():
@@ -67,18 +85,17 @@ def get_user_input(cities):
     while True:
         try:
             # Get departure city
-            departure_city = input("\nDeparture city: ")
-
-            # Get arrival city
-            arrival_city = input("Arrival city: ")
-
-            # Validate city selections
-            if departure_city not in cities:
-                print(f"Error: '{departure_city}' is not in the available cities list.")
+            raw_dep = input("\nDeparture city (e.g., Moscow, Saint Petersburg, Novosibirsk): ")
+            departure_city = match_city(raw_dep, cities)
+            if not departure_city:
+                print(f"Error: '{raw_dep}' is not in the available cities list.")
                 continue
 
-            if arrival_city not in cities:
-                print(f"Error: '{arrival_city}' is not in the available cities list.")
+            # Get arrival city
+            raw_arr = input("Arrival city (e.g., Moscow, Saint Petersburg, Novosibirsk): ")
+            arrival_city = match_city(raw_arr, cities)
+            if not arrival_city:
+                print(f"Error: '{raw_arr}' is not in the available cities list.")
                 continue
 
             if departure_city == arrival_city:
@@ -86,7 +103,7 @@ def get_user_input(cities):
                 continue
 
             # Get departure date and time
-            date_str = input("Departure date (YYYY-MM-DD, default: today): ")
+            date_str = input("Departure date (YYYY-MM-DD, default: today; between 2017-06-16 and 2017-09-14): ")
             time_str = input("Departure time (HH:MM, default: now): ")
 
             # Use current date/time as default
@@ -115,14 +132,21 @@ def display_route(route_type, route_details):
     """Display a single route with all details."""
     print(f"\n{route_type.upper()} ROUTE:")
     print(f"  Total price: {route_details['total_price']:.2f}")
-    print(f"  Total duration: {route_details['total_duration']}")
+    # Format duration into hours and minutes
+    td = route_details['total_duration']
+    total_seconds = td.total_seconds()
+    hours = int(total_seconds // 3600)
+    minutes = int((total_seconds % 3600) // 60)
+    print(f"  Total duration: {hours}h{minutes}min")
     print(f"  Transfers: {route_details['transfers']}")
 
     print("\n  Flight segments:")
     for i, segment in enumerate(route_details['path'], 1):
         print(f"  {i}. {segment['from']} → {segment['to']}")
-        print(f"     Departure: {segment['departure']}")
-        print(f"     Arrival: {segment['arrival']}")
+        dep = segment['departure'].strftime('%Y-%m-%d %H:%M')
+        arr = segment['arrival'].strftime('%Y-%m-%d %H:%M')
+        print(f"     Departure: {dep}")
+        print(f"     Arrival: {arr}")
         print(f"     Price: {segment['price']:.2f}")
 
 
